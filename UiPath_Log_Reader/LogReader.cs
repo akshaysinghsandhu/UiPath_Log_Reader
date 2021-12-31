@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -12,11 +13,11 @@ namespace LogReader
 {
     public partial class LogReader : Form
     {
-        String strSelectedItem, strLn, strActivityInfo;
+        String strLn, strActivityInfo;
         Int32 ColCnt = -1, RowCnt = -1;
         JavaScriptSerializer js = new JavaScriptSerializer();
         String JobID;
-        DataTable LogTable = new DataTable("LogTable"), FilteredLogTable = new DataTable("FilteredLogTable");
+        DataTable LogTable = new DataTable("LogTable"), dtFilteredLogTable = new DataTable("dtFilteredLogTable");
         List<String> ProcessList = new List<string>(), PListTime = new List<string>();
 
         OpenFileDialog ofd = new OpenFileDialog();
@@ -41,9 +42,6 @@ namespace LogReader
         {
             String FilePath = (Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)).ToString().Replace(@"\Roaming", @"") + @"\Local\UiPath\Logs\" + FileList.Text;
             MainSeq(FilePath);
-            PListDropDown.SelectedIndex = -1;
-            ProcessTimeStamp.SelectedIndex = -1;
-
         }
 
         public void MainSeq(String FilePath)
@@ -71,36 +69,28 @@ namespace LogReader
                             LogTable.Rows.Add();
                             if (Ln.Contains("activityInfo"))
                             {
-                                strLn = Ln.Remove(0, 21);
-                                strLn = "{" + strLn.Remove(strLn.IndexOf("activityInfo") - 2, strLn.Length - strLn.IndexOf("activityInfo"));
                                 strActivityInfo = Ln.Remove(0, Ln.IndexOf("activityInfo") + 14);
-                                strActivityInfo = strActivityInfo.Remove(strActivityInfo.Length - 1, 1);
+                                strActivityInfo = strActivityInfo.Split("}".ToCharArray())[0]+ "}";
                             }
-                            else
-                            {
                                 strLn = Ln.Remove(0, Ln.ToString().IndexOf("{")-1).Trim() ;
-                            }
 
                             if (strLn.Substring(0, 2) == "{m")
                             { strLn = strLn.Insert(1, ((char)34).ToString()); }
                             js.MaxJsonLength = 2147483647;
-                            dynamic LogInfo = js.Deserialize<dynamic>(("[" + strLn + "]").Replace("}}", "}").Replace("{ {", "{").Replace("{{", "{"));
-
-                            foreach (Dictionary<string, object> ky in LogInfo)
-                            {
-                                foreach (var key in ky.Keys)
+                            dynamic LogInfo = js.Deserialize<dynamic>(strLn);
+                                foreach (var keyValPair in LogInfo)
                                 {
-                                    if (!String.IsNullOrEmpty(key))
+                                    if (!String.IsNullOrEmpty(keyValPair.Value.ToString()))
                                     {
-                                        if (!LogTable.Columns.Contains(key)){ LogTable.Columns.Add(char.ToUpper(key[0]) + key.Substring(1)); }
+                                        if (!LogTable.Columns.Contains(keyValPair.Key)){ LogTable.Columns.Add(CultureInfo.InvariantCulture.TextInfo.ToTitleCase(keyValPair.Key.ToLower()) );}
                                         ColCnt = ++ColCnt;
-                                        LogTable.Rows[RowCnt][key.ToString()] = ky[key];
+                                            if (keyValPair.Key == "activityInfo")
+                                            { LogTable.Rows[RowCnt][keyValPair.Key.ToString()] = strActivityInfo; }
+                                            else
+                                            { LogTable.Rows[RowCnt][keyValPair.Key.ToString()] = keyValPair.Value.ToString(); }
                                         LogTable.Rows[RowCnt]["Row#"] = RowCnt + 1;
-                                        if (Ln.Contains("activityInfo")){ LogTable.Rows[RowCnt]["ActivityInfo"] = strActivityInfo; }
                                     }
-                                    }
-                            ColCnt = -1;
-                            }
+                                }
                         }
                     }   
                     catch (Exception ex)
@@ -133,9 +123,9 @@ namespace LogReader
                 }
 
                 strTxt = String.Empty;
-                FilteredLogTable = LogTable;
+                dtFilteredLogTable = LogTable;
                 dataGridView1.DataSource = null;
-                dataGridView1.DataSource = LogTable;
+                dataGridView1.DataSource = dtFilteredLogTable;
                 RecordCount_Refresh();
                 PList();
                 dataGridView1.Select();
@@ -151,23 +141,16 @@ namespace LogReader
         {
             if (LogTable.Rows.Count > 0)
             {
-                foreach (String item in CheckedListBox1.CheckedItems)
-                { strSelectedItem = strSelectedItem + item + ","; }
-                strSelectedItem = strSelectedItem.Remove(strSelectedItem.Length - 1, 1);
-                String[] ArraySelectedItem = strSelectedItem.Split((",").ToCharArray());
-                FilteredLogTable = null;
-                FilteredLogTable = (from row in LogTable.AsEnumerable().OrderBy(r => r.Field<String>("timestamp")) where ArraySelectedItem.Contains(row.Field<string>("Level")) select row).CopyToDataTable();
-                if (FilteredLogTable.Columns.Contains("ActivityInfo"))
+                dtFilteredLogTable = null;
+                dtFilteredLogTable = (from row in LogTable.AsEnumerable().OrderBy(r => r.Field<String>("timestamp")) select row).CopyToDataTable();
+                if (dtFilteredLogTable.Columns.Contains("ActivityInfo"))
                 {
-                    FilteredLogTable.Columns["ActivityInfo"].SetOrdinal(6);
+                    dtFilteredLogTable.Columns["ActivityInfo"].SetOrdinal(6);
                 }
 
                 dataGridView1.DataSource = null;
-                dataGridView1.DataSource = FilteredLogTable;
+                dataGridView1.DataSource = dtFilteredLogTable;
                 PList();
-                strSelectedItem = "";
-                PListDropDown.SelectedIndex = -1;
-                ProcessTimeStamp.SelectedIndex = -1;
                 dataGridView1.Select();
                 RecordCount_Refresh();
             }
@@ -175,7 +158,7 @@ namespace LogReader
 
         private void RecordCount_Refresh()
         {
-            RowCount.Text = "Showing " + FilteredLogTable.Rows.Count.ToString() + "/" + LogTable.Rows.Count.ToString() ;
+            RowCount.Text = "Showing " + ((DataTable)dataGridView1.DataSource).Rows.Count.ToString() + "/" + LogTable.Rows.Count.ToString() ;
             statusStrip1.Refresh();     
         }
 
@@ -183,15 +166,15 @@ namespace LogReader
         {
             if (MessageFilterValue.Text.Length > 0)
             {
-                if (FilteredLogTable.Select("Message Like '%" + System.Text.RegularExpressions.Regex.Replace(MessageFilterValue.Text, @"[\$']", @"*") + @"%'").Count() > 0)
+                if (dtFilteredLogTable.Select("Message Like '%" + System.Text.RegularExpressions.Regex.Replace(MessageFilterValue.Text, @"[\$']", @"*") + @"%'").Count() > 0)
                 {
                     
-                    dataGridView1.DataSource = FilteredLogTable.Select("Message Like '%" + System.Text.RegularExpressions.Regex.Replace(MessageFilterValue.Text, @"[\$']", @"*") + "%'").CopyToDataTable(); 
+                    dataGridView1.DataSource = dtFilteredLogTable.Select("Message Like '%" + System.Text.RegularExpressions.Regex.Replace(MessageFilterValue.Text, @"[\$']", @"*") + "%'").CopyToDataTable(); 
                 }
                 else { MessageBox.Show("No data row contains keyword:" + MessageFilterValue.Text + Environment.NewLine + "Please try different keyword."); this.ActiveControl = MessageFilterValue;  MessageFilterValue.SelectionStart = 0; MessageFilterValue.SelectionLength = MessageFilterValue.Text.Length; return; }
             }
             else
-            { dataGridView1.DataSource = FilteredLogTable; }
+            { dataGridView1.DataSource = dtFilteredLogTable; }
             dataGridView1.Select();
             RecordCount_Refresh();
         }
@@ -207,7 +190,8 @@ namespace LogReader
 
             if (GotoVal.Text.ToString().All(char.IsDigit) && GotoVal.Text.Length > 0)
             {
-                dataGridView1.DataSource = LogTable;
+                dtFilteredLogTable = LogTable.Copy();
+                dataGridView1.DataSource = dtFilteredLogTable;
                 dataGridView1.Rows[Convert.ToInt32(GotoRow)].Selected = true;
                 dataGridView1.FirstDisplayedScrollingRowIndex = Convert.ToInt32(GotoRow);
                 dataGridView1.Focus();
@@ -247,7 +231,15 @@ namespace LogReader
 
         private void CheckedListBox1_SelectedIndexChanged(object sender, EventArgs e)
         {
-
+            List<String> lst = new List<string>();
+            //for (int i = 0; i < CheckedListBox1.Items.Count; i++)
+            //{CheckedListBox1.SetItemChecked(i, true); }
+            foreach (String item in CheckedListBox1.CheckedItems){ lst.Add(item.ToString()); }
+            if ((from rw in dtFilteredLogTable.AsEnumerable() where lst.Any(val=> rw["Level"].ToString().ToLower().Trim() == val.ToLower().Trim()) select rw).Count() > 0)
+            { dataGridView1.DataSource = (from rw in dtFilteredLogTable.AsEnumerable() where lst.Contains(rw["Level"].ToString()) select rw).CopyToDataTable(); }
+            else
+            { dataGridView1.DataSource = dtFilteredLogTable.Clone(); }
+            RecordCount_Refresh();
         }
 
         private void GotoVal_KeyPress(object sender, System.Windows.Forms.KeyPressEventArgs k) { if (k.KeyChar == (Char)13) { Goto_Click(this, new EventArgs()); } }
@@ -281,10 +273,12 @@ namespace LogReader
                 {
                     JobID = LogTable.Select("Message Like '" + PListDropDown.Text + "%' and TimeStamp = '" + ProcessTimeStamp.Text + "'")[0]["jobID"].ToString();
                     dataGridView1.DataSource = null;
-                    FilteredLogTable = LogTable.Select("jobId ='" + JobID + "'").CopyToDataTable();
-                    dataGridView1.DataSource = FilteredLogTable;
+                    dtFilteredLogTable = LogTable.Select("jobId ='" + JobID + "'").CopyToDataTable();
+                    dataGridView1.DataSource = dtFilteredLogTable;
                     dataGridView1.Select();
                     RecordCount_Refresh();
+                    for (int i = 0; i < CheckedListBox1.Items.Count; i++)
+                    { CheckedListBox1.SetItemChecked(i, true); }
                 }
 
             }

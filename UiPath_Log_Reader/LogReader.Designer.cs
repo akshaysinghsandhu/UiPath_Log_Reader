@@ -98,7 +98,7 @@
             this.CheckedListBox1.CheckOnClick = true;
             this.CheckedListBox1.FormattingEnabled = true;
             this.CheckedListBox1.Items.AddRange(new object[] {
-            "Verbose",
+            "Trace",
             "Information",
             "Warning",
             "Error",

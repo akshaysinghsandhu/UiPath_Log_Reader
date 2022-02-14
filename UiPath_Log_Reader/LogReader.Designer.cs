@@ -138,7 +138,7 @@
             this.Refresh2.Name = "Refresh2";
             this.Refresh2.Size = new System.Drawing.Size(75, 24);
             this.Refresh2.TabIndex = 7;
-            this.Refresh2.Text = "Refresh";
+            this.Refresh2.Text = "Reload";
             this.Refresh2.UseVisualStyleBackColor = true;
             this.Refresh2.Click += new System.EventHandler(this.Refresh2_Click);
             // 
@@ -247,7 +247,7 @@
             this.CopyHeader.UseVisualStyleBackColor = true;
             this.CopyHeader.CheckedChanged += new System.EventHandler(this.CopyHeader_CheckedChanged);
             // 
-            // Form1
+            // LogReader
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
@@ -269,7 +269,7 @@
             this.Controls.Add(this.dataGridView1);
             this.Controls.Add(this.FileList);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
-            this.Name = "Form1";
+            this.Name = "LogReader";
             this.Text = "Log File Reader";
             this.Load += new System.EventHandler(this.Form1_Load);
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).EndInit();

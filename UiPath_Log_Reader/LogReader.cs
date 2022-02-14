@@ -13,7 +13,7 @@ namespace LogReader
 {
     public partial class LogReader : Form
     {
-        String strLn, strActivityInfo;
+        String strLn, strActivityInfo,strFilePath;
         Int32 ColCnt = -1, RowCnt = -1;
         JavaScriptSerializer js = new JavaScriptSerializer();
         String JobID;
@@ -46,6 +46,7 @@ namespace LogReader
 
         public void MainSeq(String FilePath)
         {
+            strFilePath = FilePath;
             try
             {
             LogTable.Dispose();
@@ -139,21 +140,23 @@ namespace LogReader
 
         private void Refresh2_Click(object sender, EventArgs e)
         {
-            if (LogTable.Rows.Count > 0)
-            {
-                dtFilteredLogTable = null;
-                dtFilteredLogTable = (from row in LogTable.AsEnumerable().OrderBy(r => r.Field<String>("timestamp")) select row).CopyToDataTable();
-                if (dtFilteredLogTable.Columns.Contains("ActivityInfo"))
-                {
-                    dtFilteredLogTable.Columns["ActivityInfo"].SetOrdinal(6);
-                }
+            MainSeq(strFilePath);
 
-                dataGridView1.DataSource = null;
-                dataGridView1.DataSource = dtFilteredLogTable;
-                PList();
-                dataGridView1.Select();
-                RecordCount_Refresh();
-            }
+            //if (LogTable.Rows.Count > 0)
+            //{
+            //    dtFilteredLogTable = null;
+            //    dtFilteredLogTable = (from row in LogTable.AsEnumerable().OrderBy(r => r.Field<String>("timestamp")) select row).CopyToDataTable();
+            //    if (dtFilteredLogTable.Columns.Contains("ActivityInfo"))
+            //    {
+            //        dtFilteredLogTable.Columns["ActivityInfo"].SetOrdinal(6);
+            //    }
+
+            //    dataGridView1.DataSource = null;
+            //    dataGridView1.DataSource = dtFilteredLogTable;
+            //    PList();
+            //    dataGridView1.Select();
+            //    RecordCount_Refresh();
+            //}
         }
 
         private void RecordCount_Refresh()
